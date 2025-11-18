@@ -3,82 +3,85 @@ console.log("✅ script.js loaded");
 async function loadData() {
   console.log("✅ loadData started");
 
-  // 1. Load CSV
+  // 1. Load your plant CSV
   let data = await d3.csv("plantdata.csv", d3.autoType);
-  console.log("raw data:", data);
-  console.log("columns:", data.columns);
+  console.log("raw plant data:", data);
+  console.log("columns from d3:", data.columns);
 
   // 2. Create a numeric field from "% of grief processed"
   data.forEach(d => {
-    // d["% of grief processed"] is like "10.00%" or "0"
     let val = d["% of grief processed"];
 
-    if (typeof val === "string") {
-      val = val.replace("%", ""); // remove %
+    if (val === null || val === undefined || val === "") {
+      d.griefPercent = NaN;
+      return;
     }
 
-    d.griefPercent = val === "" ? NaN : +val; // convert to Number
+    if (typeof val === "string") {
+      // parseFloat("10.00%") → 10
+      d.griefPercent = parseFloat(val);
+    } else {
+      d.griefPercent = val;
+    }
   });
 
-  console.log("with griefPercent:", data);
+  console.log("griefPercent values:", data.map(d => d.griefPercent));
 
-  const numericField = "griefPercent"; // 👈 this is our numeric field now
+  const numericField = "griefPercent"; // 👈 our chosen numeric property
 
-  // 3. FILTER: only plants where griefPercent >= 20
-  let filteredData = d3.filter(data, d => d[numericField] >= 20);
-  console.log("filtered (griefPercent >= 20):", filteredData);
+  // 3. FILTER: keep only rows where griefPercent is a real number
+  const filtered = data.filter(d => Number.isFinite(d[numericField]));
+  console.log("filtered (finite griefPercent):", filtered);
 
-  // 4. SORT: sort descending by griefPercent
-  let sortedData = d3.sort(filteredData, (a, b) =>
+  // 4. SORT: descending by griefPercent
+  const sorted = d3.sort(filtered, (a, b) =>
     d3.descending(a[numericField], b[numericField])
   );
-  console.log("sorted descending:", sortedData);
+  console.log("sorted by griefPercent (desc):", sorted);
 
   // 5. MEAN
-  let mean = d3.mean(filteredData, d => d[numericField]);
+  const mean = d3.mean(filtered, d => d[numericField]);
   console.log("mean griefPercent:", mean);
 
   // 6. SUM
-  let sum = d3.sum(filteredData, d => d[numericField]);
+  const sum = d3.sum(filtered, d => d[numericField]);
   console.log("sum griefPercent:", sum);
 
   // 7. MIN
-  let min = d3.min(filteredData, d => d[numericField]);
+  const min = d3.min(filtered, d => d[numericField]);
   console.log("min griefPercent:", min);
 
   // 8. MAX
-  let max = d3.max(filteredData, d => d[numericField]);
+  const max = d3.max(filtered, d => d[numericField]);
   console.log("max griefPercent:", max);
 
   // 9. MODE (most common griefPercent value)
-  let mode;
-  if (d3.mode) {
-    mode = d3.mode(filteredData, d => d[numericField]);
-  } else {
-    const counts = {};
-    filteredData.forEach(d => {
-      const v = d[numericField];
-      counts[v] = (counts[v] || 0) + 1;
-    });
-    let maxCount = 0;
-    let modeVal = null;
-    for (const v in counts) {
-      if (counts[v] > maxCount) {
-        maxCount = counts[v];
-        modeVal = Number(v);
-      }
+  const counts = {};
+  filtered.forEach(d => {
+    const v = d[numericField];
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  let maxCount = 0;
+  let modeVal = null;
+  for (const v in counts) {
+    if (counts[v] > maxCount) {
+      maxCount = counts[v];
+      modeVal = Number(v);
     }
-    mode = modeVal;
   }
+  const mode = modeVal;
   console.log("mode griefPercent:", mode);
 
-  // 10. Build an HTML table (so you see it on the page, not just console)
-  let table = document.createElement("table");
+  // 10. OPTIONAL: build a table so you see it on the page
 
-  // Start with the original CSV columns
-  let columns = data.columns.slice(); // copy
-  // And add our new computed column
-  columns.push("griefPercent");
+  const table = document.createElement("table");
+
+  // Start with original CSV columns
+  let columns = data.columns.slice();
+  // Add our computed numeric field at the end
+  if (!columns.includes("griefPercent")) {
+    columns.push("griefPercent");
+  }
 
   // Header row
   let header = "<tr>";
@@ -87,9 +90,9 @@ async function loadData() {
   });
   header += "</tr>";
 
-  // Body rows: use sortedData so the table reflects your transforms
+  // Rows: use sorted data so the table matches the transforms
   let rows = "";
-  sortedData.forEach(rowObj => {
+  sorted.forEach(rowObj => {
     rows += "<tr>";
     columns.forEach(colName => {
       rows += "<td>" + (rowObj[colName] ?? "") + "</td>";
@@ -97,11 +100,15 @@ async function loadData() {
     rows += "</tr>";
   });
 
-  table.innerHTML = header + rows;
+  console.log("number of rows in table:", sorted.length);
 
-  let body = document.querySelector("body");
-  body.appendChild(table);
+  table.innerHTML = header + rows;
+  document.body.appendChild(table);
 }
+
+window.onload = function () {
+  loadData();
+};
 
 window.onload = function () {
   loadData();
