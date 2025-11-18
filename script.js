@@ -1,53 +1,62 @@
-
-
 console.log("✅ script.js loaded");
 
 async function loadData() {
   console.log("✅ loadData started");
 
-  // 1. Load the data
+  // 1. Load CSV
   let data = await d3.csv("plantdata.csv", d3.autoType);
   console.log("raw data:", data);
+  console.log("columns:", data.columns);
 
-  let columns = data.columns;
-  console.log("columns:", columns);
+  // 2. Create a numeric field from "% of grief processed"
+  data.forEach(d => {
+    // d["% of grief processed"] is like "10.00%" or "0"
+    let val = d["% of grief processed"];
 
-  // 🔢 choose your numeric column name here
-  const numericField = "% of grief processed"; // change this if yours is different!
+    if (typeof val === "string") {
+      val = val.replace("%", ""); // remove %
+    }
 
-  // 2. FILTER: keep only rows where numericField <= 20
-  let filteredData = d3.filter(data, (d) => d[numericField] <= 20);
-  console.log("filtered (<= 20):", filteredData);
+    d.griefPercent = val === "" ? NaN : +val; // convert to Number
+  });
 
-  // 3. SORT: sort filtered data descending by numericField
+  console.log("with griefPercent:", data);
+
+  const numericField = "griefPercent"; // 👈 this is our numeric field now
+
+  // 3. FILTER: only plants where griefPercent >= 20
+  let filteredData = d3.filter(data, d => d[numericField] >= 20);
+  console.log("filtered (griefPercent >= 20):", filteredData);
+
+  // 4. SORT: sort descending by griefPercent
   let sortedData = d3.sort(filteredData, (a, b) =>
     d3.descending(a[numericField], b[numericField])
   );
   console.log("sorted descending:", sortedData);
 
-  // 4. MEAN
-  let mean = d3.mean(filteredData, (d) => d[numericField]);
-  console.log("mean:", mean);
+  // 5. MEAN
+  let mean = d3.mean(filteredData, d => d[numericField]);
+  console.log("mean griefPercent:", mean);
 
-  // 5. SUM
-  let sum = d3.sum(filteredData, (d) => d[numericField]);
-  console.log("sum:", sum);
+  // 6. SUM
+  let sum = d3.sum(filteredData, d => d[numericField]);
+  console.log("sum griefPercent:", sum);
 
-  // 6. MIN
-  let min = d3.min(filteredData, (d) => d[numericField]);
-  console.log("min:", min);
+  // 7. MIN
+  let min = d3.min(filteredData, d => d[numericField]);
+  console.log("min griefPercent:", min);
 
-  // 7. MAX
-  let max = d3.max(filteredData, (d) => d[numericField]);
-  console.log("max:", max);
+  // 8. MAX
+  let max = d3.max(filteredData, d => d[numericField]);
+  console.log("max griefPercent:", max);
 
-  // 8. MODE
+  // 9. MODE (most common griefPercent value)
   let mode;
   if (d3.mode) {
-    mode = d3.mode(filteredData, (d) => d[numericField]);
+    mode = d3.mode(filteredData, d => d[numericField]);
   } else {
     const counts = {};
-    filteredData.forEach((d) => {
+    filteredData.forEach(d => {
       const v = d[numericField];
       counts[v] = (counts[v] || 0) + 1;
     });
@@ -61,24 +70,29 @@ async function loadData() {
     }
     mode = modeVal;
   }
-  console.log("mode:", mode);
+  console.log("mode griefPercent:", mode);
 
-  // 9. Build an HTML table from the sorted data
+  // 10. Build an HTML table (so you see it on the page, not just console)
   let table = document.createElement("table");
+
+  // Start with the original CSV columns
+  let columns = data.columns.slice(); // copy
+  // And add our new computed column
+  columns.push("griefPercent");
 
   // Header row
   let header = "<tr>";
-  columns.forEach((colName) => {
+  columns.forEach(colName => {
     header += "<th>" + colName + "</th>";
   });
   header += "</tr>";
 
-  // Body rows: use all columns dynamically
+  // Body rows: use sortedData so the table reflects your transforms
   let rows = "";
-  sortedData.forEach((rowObj) => {
+  sortedData.forEach(rowObj => {
     rows += "<tr>";
-    columns.forEach((colName) => {
-      rows += "<td>" + rowObj[colName] + "</td>";
+    columns.forEach(colName => {
+      rows += "<td>" + (rowObj[colName] ?? "") + "</td>";
     });
     rows += "</tr>";
   });
@@ -92,3 +106,4 @@ async function loadData() {
 window.onload = function () {
   loadData();
 };
+
